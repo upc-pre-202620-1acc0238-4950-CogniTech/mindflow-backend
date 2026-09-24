@@ -282,4 +282,12 @@ app.UseAuthorization();
 app.UseRateLimiter();
 app.MapControllers();
 
+app.MapGet("/health", async (AppDbContext db) =>
+{
+    var canConnect = await db.Database.CanConnectAsync();
+    return canConnect
+        ? Results.Ok(new { status = "ok", database = "connected" })
+        : Results.Problem("Database unreachable.", statusCode: StatusCodes.Status503ServiceUnavailable);
+});
+
 app.Run();
