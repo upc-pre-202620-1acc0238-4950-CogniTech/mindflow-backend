@@ -2,10 +2,16 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using Cortex.Mediator.DependencyInjection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Mindflow_backend.Analytics.Application.Services;
+using Mindflow_backend.Journal.Application.Services;
+using Mindflow_backend.Journal.Domain.Services;
+using Mindflow_backend.Journal.Infrastructure.BackgroundServices;
+using Mindflow_backend.Journal.Infrastructure.Services;
 using Mindflow_backend.iam.application.Internal.commandservices;
 using Mindflow_backend.iam.application.services;
 using Mindflow_backend.iam.domain.repositories;
@@ -133,6 +139,11 @@ builder.Services.AddScoped<IGoogleAuthService, GoogleAuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IUserCommandService, UserCommandService>();
 
+builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
+builder.Services.AddScoped<IJournalSearchIndexer, JournalSearchIndexer>();
+builder.Services.AddScoped<IAnalyticsCacheInvalidator, AnalyticsCacheInvalidatorStub>();
+builder.Services.AddHostedService<JournalSearchBackfillService>();
+
 builder.Services.AddHttpContextAccessor();
 
 var encryptionKey = builder.Configuration["Encryption:AesKey"];
@@ -145,6 +156,19 @@ if (string.IsNullOrEmpty(encryptionKey))
     encryptionKey = Convert.ToBase64String(new byte[32]);
 }
 builder.Services.AddSingleton(new AesEncryptionService(encryptionKey));
+
+var searchIndexKey = builder.Configuration["Encryption:SearchIndexKey"];
+if (string.IsNullOrEmpty(searchIndexKey))
+{
+    if (!builder.Environment.IsDevelopment())
+        throw new InvalidOperationException(
+            "Encryption:SearchIndexKey not configured. Generate one with SearchTokenHasher.GenerateKey().");
+    // Dev-only fallback; journal search tokens won't match across restarts but nothing breaks
+    searchIndexKey = SearchTokenHasher.GenerateKey();
+}
+builder.Services.AddSingleton<ISearchTokenHasher>(new SearchTokenHasher(searchIndexKey));
+
+builder.Services.AddCortexMediator([typeof(Program)]);
 
 var app = builder.Build();
 
