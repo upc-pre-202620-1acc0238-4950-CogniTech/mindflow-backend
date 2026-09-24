@@ -14,6 +14,13 @@ using Mindflow_backend.AiIntegration.Application.Services;
 using Mindflow_backend.AiIntegration.Infrastructure.Services;
 using Mindflow_backend.Chat.Application.Services;
 using Mindflow_backend.Chat.Infrastructure.Services;
+using Mindflow_backend.Habits.Application.Internal.CommandServices;
+using Mindflow_backend.Habits.Application.Internal.QueryServices;
+using Mindflow_backend.Habits.Domain.Repositories;
+using Mindflow_backend.Habits.Infrastructure.Persistence.Ef.Repositories;
+using Mindflow_backend.WellnessEngine.Application.Services;
+using Mindflow_backend.WellnessContent.Domain.Entities;
+using Mindflow_backend.Shared.Infrastructure.Caching;
 using Mindflow_backend.Journal.Application.Services;
 using Mindflow_backend.Journal.Domain.Services;
 using Mindflow_backend.Journal.Infrastructure.BackgroundServices;
@@ -155,6 +162,25 @@ builder.Services.AddHttpClient("Gemini", c => c.Timeout = TimeSpan.FromSeconds(3
 builder.Services.AddScoped<IAiService, GeminiService>();
 builder.Services.AddScoped<IAiFeedbackService, AiFeedbackService>();
 
+builder.Services.AddScoped<IHabitRepository, HabitRepository>();
+builder.Services.AddScoped<IHabitCompletionLogRepository, HabitCompletionLogRepository>();
+builder.Services.AddScoped<IHabitCommandService, HabitCommandService>();
+builder.Services.AddScoped<IHabitLogCommandService, HabitLogCommandService>();
+builder.Services.AddScoped<IHabitQueryService, HabitQueryService>();
+builder.Services.AddScoped<IHabitLogQueryService, HabitLogQueryService>();
+builder.Services.AddScoped<IWellnessService, WellnessService>();
+
+var redisConnectionString = builder.Configuration.GetConnectionString("Redis")
+    ?? throw new InvalidOperationException(
+        "ConnectionStrings:Redis not configured. Run `docker-compose up redis` locally or set it in your environment.");
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = redisConnectionString;
+    options.InstanceName = "mindflow:";
+});
+builder.Services.AddScoped<ICacheService, RedisCacheService>();
+
 builder.Services.AddHttpContextAccessor();
 
 var encryptionKey = builder.Configuration["Encryption:AesKey"];
@@ -187,6 +213,54 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     context.Database.Migrate();
+
+    if (!await context.WellnessExercises.AnyAsync())
+    {
+        context.WellnessExercises.AddRange(
+            new WellnessExercise
+            {
+                Type = WellnessExercise.TypeBreathing,
+                Name = "Respiración 4-7-8",
+                Description = "Inhala 4 segundos, sostén 7, exhala 8. Ideal para calmar la ansiedad rápidamente.",
+                DurationSeconds = 76,
+                InhaleSeconds = 4,
+                HoldSeconds = 7,
+                ExhaleSeconds = 8,
+                Cycles = 4,
+                SortOrder = 1
+            },
+            new WellnessExercise
+            {
+                Type = WellnessExercise.TypeBreathing,
+                Name = "Respiración Cuadrada (Box Breathing)",
+                Description = "Inhala, sostén, exhala y sostén de nuevo, todo por 4 segundos. Usada por atletas y militares para mantener la calma bajo presión.",
+                DurationSeconds = 64,
+                InhaleSeconds = 4,
+                HoldSeconds = 4,
+                ExhaleSeconds = 4,
+                HoldAfterExhaleSeconds = 4,
+                Cycles = 4,
+                SortOrder = 2
+            },
+            new WellnessExercise
+            {
+                Type = WellnessExercise.TypeMeditation,
+                Name = "Micro-meditación de 5 minutos",
+                Description = "Una pausa guiada para enfocar tu atención y reducir el estrés durante el día.",
+                DurationSeconds = 300,
+                SortOrder = 1
+            },
+            new WellnessExercise
+            {
+                Type = WellnessExercise.TypeMeditation,
+                Name = "Meditación para dormir",
+                Description = "Una meditación relajante de 10 minutos para prepararte para descansar.",
+                DurationSeconds = 600,
+                SortOrder = 2
+            });
+
+        await context.SaveChangesAsync();
+    }
 }
 
 app.UseCorrelationId();
