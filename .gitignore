@@ -1,0 +1,17 @@
+# .NET build output
+bin/
+obj/
+
+# Rider / JetBrains
+.idea/
+*.sln.DotSettings.user
+
+# Visual Studio
+.vs/
+*.user
+
+# Local secrets / environment overrides (never commit real credentials)
+appsettings.Development.json
+appsettings.*.local.json
+*.env
+.env

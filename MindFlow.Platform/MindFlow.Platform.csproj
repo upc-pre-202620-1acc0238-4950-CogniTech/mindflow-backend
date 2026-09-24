@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <RootNamespace>Mindflow_backend</RootNamespace>
+      <UserSecretsId>45252a19-3d33-4a17-8b18-c6b8464abe9f</UserSecretsId>
+  </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
+        <PackageReference Include="CloudinaryDotNet" Version="1.29.2" />
+        <PackageReference Include="Cortex.Mediator" Version="3.1.2" />
+        <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
+        <PackageReference Include="Humanizer" Version="3.0.10" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.8" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.8" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8">
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+          <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.8" />
+        <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.0" />
+        <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.18.0" />
+        <PackageReference Include="Microsoft.OpenApi" Version="2.9.0" />
+        <PackageReference Include="MySql.EntityFrameworkCore" Version="10.0.7" />
+        <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+        <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.0" />
+        <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="10.2.0" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.18.0" />
+    </ItemGroup>
+
+</Project>
