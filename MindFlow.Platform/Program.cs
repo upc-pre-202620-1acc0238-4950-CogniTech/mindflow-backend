@@ -8,6 +8,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Mindflow_backend.Analytics.Application.Services;
+using Mindflow_backend.AiFeedback.Application.Services;
+using Mindflow_backend.AiFeedback.Infrastructure.Services;
+using Mindflow_backend.AiIntegration.Application.Services;
+using Mindflow_backend.AiIntegration.Infrastructure.Services;
+using Mindflow_backend.Chat.Application.Services;
+using Mindflow_backend.Chat.Infrastructure.Services;
 using Mindflow_backend.Journal.Application.Services;
 using Mindflow_backend.Journal.Domain.Services;
 using Mindflow_backend.Journal.Infrastructure.BackgroundServices;
@@ -143,6 +149,11 @@ builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
 builder.Services.AddScoped<IJournalSearchIndexer, JournalSearchIndexer>();
 builder.Services.AddScoped<IAnalyticsCacheInvalidator, AnalyticsCacheInvalidatorStub>();
 builder.Services.AddHostedService<JournalSearchBackfillService>();
+
+builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddHttpClient("Gemini", c => c.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddScoped<IAiService, GeminiService>();
+builder.Services.AddScoped<IAiFeedbackService, AiFeedbackService>();
 
 builder.Services.AddHttpContextAccessor();
 
