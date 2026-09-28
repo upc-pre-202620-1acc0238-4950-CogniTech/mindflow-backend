@@ -16,6 +16,10 @@ using EntryTag = Mindflow_backend.Journal.Domain.Entities.EntryTag;
 using Tag = Mindflow_backend.Journal.Domain.Entities.Tag;
 using Media = Mindflow_backend.Journal.Domain.Entities.Media;
 using JournalSearchToken = Mindflow_backend.Journal.Domain.Entities.JournalSearchToken;
+using Notification = Mindflow_backend.Notifications.Domain.Entities.Notification;
+using SupportTicket = Mindflow_backend.Support.Domain.Entities.SupportTicket;
+using SupportMessage = Mindflow_backend.Support.Domain.Entities.SupportMessage;
+using Subscription = Mindflow_backend.Subscriptions.Domain.Entities.Subscription;
 
 namespace Mindflow_backend.Shared.Infrastructure.Persistence.EntityFrameworkCore.Configuration;
 
@@ -34,6 +38,10 @@ public class AppDbContext(DbContextOptions options, AesEncryptionService encrypt
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
     public DbSet<WellnessExercise> WellnessExercises => Set<WellnessExercise>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
+    public DbSet<SupportMessage> SupportMessages => Set<SupportMessage>();
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder builder)
     {
@@ -172,6 +180,32 @@ public class AppDbContext(DbContextOptions options, AesEncryptionService encrypt
             entity.Property(m => m.Content).IsRequired().HasColumnType("LONGTEXT")
                   .HasConversion(encryptedConverter);
             entity.HasIndex(m => m.ConversationId);
+        });
+
+        builder.Entity<Notification>(entity =>
+        {
+            entity.Property(x => x.Type).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.Title).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Body).IsRequired().HasMaxLength(2000);
+            entity.HasIndex(x => new { x.UserId, x.ReadAt });
+        });
+        builder.Entity<SupportTicket>(entity =>
+        {
+            entity.Property(x => x.Subject).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Category).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.Priority).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.Status).IsRequired().HasMaxLength(20);
+            entity.HasIndex(x => new { x.OwnerId, x.Status });
+            entity.HasMany(x => x.Messages).WithOne(x => x.Ticket).HasForeignKey(x => x.TicketId).OnDelete(DeleteBehavior.Cascade);
+        });
+        builder.Entity<SupportMessage>(entity => entity.Property(x => x.Body).IsRequired().HasColumnType("TEXT"));
+        builder.Entity<Subscription>(entity =>
+        {
+            entity.Property(x => x.Plan).IsRequired().HasMaxLength(30);
+            entity.Property(x => x.Status).IsRequired().HasMaxLength(30);
+            entity.Property(x => x.StripeCustomerId).HasMaxLength(255);
+            entity.Property(x => x.StripeSubscriptionId).HasMaxLength(255);
+            entity.HasIndex(x => x.UserId).IsUnique();
         });
 
         builder.UseSnakeCaseNamingConvention();

@@ -18,6 +18,7 @@ public partial class User : IAuditableEntity
     public string? PinHash { get; private set; }
 
     public const string AdminRole = "Admin";
+    public const string SupportRole = "Support";
     public const string DefaultRole = "User";
 
     public string Role { get; private set; } = DefaultRole;
