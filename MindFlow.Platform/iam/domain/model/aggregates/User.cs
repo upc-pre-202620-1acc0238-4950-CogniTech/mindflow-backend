@@ -54,6 +54,12 @@ public partial class User : IAuditableEntity
         return this;
     }
 
+    public User PromoteToSupport()
+    {
+        Role = SupportRole;
+        return this;
+    }
+
     public void LinkGoogle(string googleId) => GoogleId = googleId;
 
     public User UpdatePasswordHash(string password)

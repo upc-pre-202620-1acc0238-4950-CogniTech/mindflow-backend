@@ -48,4 +48,21 @@ public class EmailService(IConfiguration configuration, ILogger<EmailService> lo
             throw;
         }
     }
+
+    public async Task SendNotificationAsync(string toEmail, string subject, string message)
+    {
+        var smtp = configuration.GetSection("Email");
+        if (string.IsNullOrWhiteSpace(smtp["Host"]) || string.IsNullOrWhiteSpace(smtp["From"]))
+        {
+            logger.LogInformation("SMTP is not configured; notification email for {Email} was skipped.", toEmail);
+            return;
+        }
+        try
+        {
+            using var client = new SmtpClient(smtp["Host"], int.Parse(smtp["Port"] ?? "587")) { EnableSsl = true, Credentials = new NetworkCredential(smtp["Username"], smtp["Password"]) };
+            using var mail = new MailMessage(smtp["From"]!, toEmail, subject, message) { IsBodyHtml = false };
+            await client.SendMailAsync(mail);
+        }
+        catch (Exception ex) { logger.LogError(ex, "Failed to send notification email to {Email}.", toEmail); }
+    }
 }
