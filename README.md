@@ -133,9 +133,19 @@ dotnet run --project MindFlow.Platform
 ```
 Las migraciones de EF Core se aplican automáticamente al iniciar (`Database.Migrate()`), junto con una siembra inicial de ejercicios de bienestar.
 
+La app corre en un puerto fijo (`http://localhost:5166`, definido en `Properties/launchSettings.json`) para que el frontend tenga una URL estable a la cual apuntar.
+
 ### 5. Verificar
-- Swagger UI: `http://localhost:<puerto>/swagger`
-- Health check (verifica conexión a BD): `http://localhost:<puerto>/health`
+- Swagger UI: `http://localhost:5166/swagger`
+- Health check (verifica conexión a BD): `http://localhost:5166/health`
+
+### 6. Conectar el frontend (Android) a este backend local
+Un emulador Android no comparte el `localhost` de Windows: usa la IP especial `10.0.2.2` para llegar al host. Desde un dispositivo físico, usa en su lugar la IP LAN de tu PC (ambos deben estar en la misma red Wi-Fi), y habilita el firewall de Windows para el puerto 5166.
+
+| Cliente | Base URL |
+|---|---|
+| Emulador Android | `http://10.0.2.2:5166/` |
+| Dispositivo físico | `http://<IP-LAN-de-tu-PC>:5166/` |
 
 ## Estado actual
 
