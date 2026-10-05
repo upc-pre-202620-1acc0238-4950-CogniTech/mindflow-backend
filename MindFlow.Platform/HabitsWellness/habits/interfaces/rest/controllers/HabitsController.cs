@@ -17,7 +17,7 @@ using Mindflow_backend.Shared.Interfaces.Rest.ProblemDetails;
 namespace Mindflow_backend.Habits.Interfaces.Rest.Controllers;
 
 [ApiController]
-[Route("habits")]
+[Route("api/v1/habits")]
 [Authorize]
 public class HabitsController : ControllerBase
 {

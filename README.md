@@ -68,18 +68,18 @@ MindFlow.Platform/
 ### IAM (`api/v1/users`)
 Registro, inicio de sesión (con JWT), autenticación con Google, recuperación de contraseña, visualización/edición de perfil, eliminación de cuenta (con borrado en cascada de datos relacionados), y PIN de acceso rápido.
 
-### Journal (`/journal`)
+### Journal (`api/v1/journal`)
 CRUD de entradas de diario, etiquetas (tags), relación entrada-etiqueta, subida y consulta de archivos multimedia (vía Cloudinary), y sincronización de entradas.
 
 ### AI Assistant
-- **Chat** (`/chat`): conversaciones y mensajes con el asistente de IA.
-- **AiIntegration**: servicio interno que conecta con la API de Gemini (usado por Chat).
+- **Chat** (`api/v1/chat`): conversaciones y mensajes con el asistente de IA.
+- **AiIntegration**: servicio interno que conecta con la API de Gemini (usado por Chat). Expone `IAiService` con métodos reutilizables (respuesta empática, resumen semanal, consejos de estrés, sugerencias de hábitos) pero aún sin controller propio.
 - **AiFeedback** (`api/v1/ai-feedback`): calificación (1-5) del contenido generado por IA y resumen estadístico de esas calificaciones.
 
 ### Habits & Wellness
-- **Habits** (`/habits`, `/habit-logs`): creación/edición/eliminación de hábitos, registro diario de cumplimiento, resumen de rachas (*streaks*) y sugerencias de hábitos.
-- **WellnessEngine** (`/wellness/stress-check`): chequeo de nivel de estrés.
-- **WellnessContent** (`/wellness/exercises`): catálogo de ejercicios de bienestar (respiración, meditación), con semilla inicial de datos.
+- **Habits** (`api/v1/habits`, `api/v1/habit-logs`): creación/edición/eliminación de hábitos, registro diario de cumplimiento, resumen de rachas (*streaks*) y sugerencias de hábitos.
+- **WellnessEngine** (`api/v1/wellness/stress-check`): chequeo de nivel de estrés.
+- **WellnessContent** (`api/v1/wellness/exercises`): catálogo de ejercicios de bienestar (respiración, meditación), con semilla inicial de datos.
 
 ### Analytics & Reporting (`api/v1/analytics`)
 Dashboard con métricas del usuario (entradas de diario por sentimiento/categoría, hábitos completados), y exportación de reportes en CSV y PDF.
@@ -139,4 +139,4 @@ Las migraciones de EF Core se aplican automáticamente al iniciar (`Database.Mig
 
 ## Estado actual
 
-Esqueleto funcional: los 8 bounded contexts + shared kernel compilan sin errores, la API corre localmente con base de datos y cache reales, y cada bounded context expone sus endpoints REST principales. Pendiente: pruebas automatizadas, pipeline de CI/CD, placeholders de `Stripe` en `appsettings.json` (actualmente ausentes), y validación de contratos contra el frontend.
+Esqueleto funcional: los 8 bounded contexts + shared kernel compilan sin errores, la API corre localmente con base de datos y cache reales, cada bounded context expone sus endpoints REST principales bajo `api/v1/...`, y los placeholders de configuración (incluido `Stripe`) están completos en `appsettings.json`. Pendiente: pruebas automatizadas, pipeline de CI/CD, y validación de contratos contra el frontend (que hoy es 100% local/offline y todavía no consume esta API).

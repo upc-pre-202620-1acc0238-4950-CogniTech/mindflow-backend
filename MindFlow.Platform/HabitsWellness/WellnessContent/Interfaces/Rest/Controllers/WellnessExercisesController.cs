@@ -9,7 +9,7 @@ using Mindflow_backend.WellnessContent.Application.Queries;
 namespace Mindflow_backend.WellnessContent.Interfaces.Rest.Controllers;
 
 [ApiController]
-[Route("wellness/exercises")]
+[Route("api/v1/wellness/exercises")]
 [Authorize]
 public sealed class WellnessExercisesController(IMediator mediator) : ControllerBase
 {
