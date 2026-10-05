@@ -1,4 +1,5 @@
 using Cortex.Mediator.Commands;
+using Mindflow_backend.AiIntegration.Application.Services;
 using Mindflow_backend.Analytics.Application.Services;
 using Mindflow_backend.Journal.Application.Commands;
 using Mindflow_backend.Journal.Application.Dtos;
@@ -13,7 +14,8 @@ public class CreateJournalEntryHandler(
     IBaseRepository<JournalEntry> repository,
     IUnitOfWork unitOfWork,
     IAnalyticsCacheInvalidator cacheInvalidator,
-    IJournalSearchIndexer searchIndexer) : ICommandHandler<CreateJournalEntryCommand, Result<JournalEntryDto>>
+    IJournalSearchIndexer searchIndexer,
+    IAiService aiService) : ICommandHandler<CreateJournalEntryCommand, Result<JournalEntryDto>>
 {
     private static readonly string[] PositiveWords =
         ["feliz", "bien", "genial", "excelente", "alegre", "contento", "motivado", "logré",
@@ -36,6 +38,8 @@ public class CreateJournalEntryHandler(
                       : "neutral";
         }
 
+        var aiResponse = await aiService.GenerateEmpathicResponseAsync(request.Content, sentiment);
+
         var entry = new JournalEntry
         {
             UserId = request.UserId,
@@ -44,7 +48,8 @@ public class CreateJournalEntryHandler(
             Content = request.Content,
             Sentiment = sentiment,
             Category = request.Category,
-            HasPreview = request.Content.Length > 200
+            HasPreview = request.Content.Length > 200,
+            AiResponse = string.IsNullOrWhiteSpace(aiResponse) ? null : aiResponse
         };
 
         await repository.AddAsync(entry, ct);
