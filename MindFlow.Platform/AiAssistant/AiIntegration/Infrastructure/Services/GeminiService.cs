@@ -145,9 +145,11 @@ public class GeminiService(
             var json = JsonSerializer.Serialize(requestBody);
 
             // Gemini devuelve 503 "high demand" con frecuencia en el tier gratuito; el propio
-            // mensaje dice que es temporal, así que reintentamos un par de veces antes de caer
-            // a la respuesta vacía (que el caller muestra como un mensaje genérico de fallback).
-            const int maxAttempts = 3;
+            // mensaje dice que es temporal, así que reintentamos antes de caer a la respuesta
+            // vacía (que el caller muestra como un mensaje genérico de fallback). Solo 1 reintento
+            // (no 2+) para no acumular una espera tan larga que el cliente móvil corte la conexión
+            // primero — ver el timeout de OkHttp en ApiClient.kt del frontend.
+            const int maxAttempts = 2;
             for (var attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 using var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
