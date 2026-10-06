@@ -14,7 +14,7 @@ public class GeminiService(
     AppDbContext dbContext) : IAiService
 {
     private string ApiBase =>
-        $"https://generativelanguage.googleapis.com/v1beta/models/{configuration["AiSettings:GeminiModel"] ?? "gemini-2.0-flash"}:generateContent";
+        $"https://generativelanguage.googleapis.com/v1beta/models/{configuration["AiSettings:GeminiModel"] ?? "gemini-3.8-flash"}:generateContent";
 
     public async Task<string> GenerateEmpathicResponseAsync(string content, string sentiment)
     {
@@ -143,35 +143,58 @@ public class GeminiService(
             };
 
             var json = JsonSerializer.Serialize(requestBody);
-            using var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var client = httpClientFactory.CreateClient("Gemini");
-            using var request = new HttpRequestMessage(HttpMethod.Post, ApiBase);
-            request.Headers.Add("x-goog-api-key", apiKey);
-            request.Content = httpContent;
-            var response = await client.SendAsync(request);
-
-            if (!response.IsSuccessStatusCode)
+            // Gemini devuelve 503 "high demand" con frecuencia en el tier gratuito; el propio
+            // mensaje dice que es temporal, así que reintentamos antes de caer a la respuesta
+            // vacía (que el caller muestra como un mensaje genérico de fallback). Solo 1 reintento
+            // (no 2+) para no acumular una espera tan larga que el cliente móvil corte la conexión
+            // primero — ver el timeout de OkHttp en ApiClient.kt del frontend.
+            const int maxAttempts = 2;
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
             {
-                var errorBody = await response.Content.ReadAsStringAsync();
-                errorMsg = $"HTTP {(int)response.StatusCode}: {errorBody[..Math.Min(errorBody.Length, 500)]}";
-                logger.LogWarning("Gemini API error for {Operation}: {Error}", operation, errorMsg);
-                return string.Empty;
+                using var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
+                var client = httpClientFactory.CreateClient("Gemini");
+                using var request = new HttpRequestMessage(HttpMethod.Post, ApiBase);
+                request.Headers.Add("x-goog-api-key", apiKey);
+                request.Content = httpContent;
+                var response = await client.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync();
+                    errorMsg = $"HTTP {(int)response.StatusCode}: {errorBody[..Math.Min(errorBody.Length, 500)]}";
+                    var retryable = response.StatusCode is System.Net.HttpStatusCode.ServiceUnavailable or System.Net.HttpStatusCode.TooManyRequests;
+
+                    if (retryable && attempt < maxAttempts)
+                    {
+                        logger.LogWarning(
+                            "Gemini API error for {Operation} (attempt {Attempt}/{MaxAttempts}): {Error}. Retrying…",
+                            operation, attempt, maxAttempts, errorMsg);
+                        await Task.Delay(TimeSpan.FromSeconds(attempt * 2));
+                        continue;
+                    }
+
+                    logger.LogWarning("Gemini API error for {Operation}: {Error}", operation, errorMsg);
+                    return string.Empty;
+                }
+
+                var responseJson = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(responseJson);
+
+                var text = doc.RootElement
+                    .GetProperty("candidates")[0]
+                    .GetProperty("content")
+                    .GetProperty("parts")[0]
+                    .GetProperty("text")
+                    .GetString();
+
+                responseText = text?.Trim() ?? string.Empty;
+                success = !string.IsNullOrEmpty(responseText);
+                errorMsg = null;
+                return responseText;
             }
 
-            var responseJson = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(responseJson);
-
-            var text = doc.RootElement
-                .GetProperty("candidates")[0]
-                .GetProperty("content")
-                .GetProperty("parts")[0]
-                .GetProperty("text")
-                .GetString();
-
-            responseText = text?.Trim() ?? string.Empty;
-            success = !string.IsNullOrEmpty(responseText);
-            return responseText;
+            return string.Empty;
         }
         catch (Exception ex)
         {

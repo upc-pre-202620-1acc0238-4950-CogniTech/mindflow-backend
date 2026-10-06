@@ -13,7 +13,7 @@ using Mindflow_backend.Shared.Interfaces.Rest.ProblemDetails;
 namespace Mindflow_backend.Habits.Interfaces.Rest.Controllers;
 
 [ApiController]
-[Route("habit-logs")]
+[Route("api/v1/habit-logs")]
 [Authorize]
 public class HabitLogsController : ControllerBase
 {

@@ -11,7 +11,7 @@ using Mindflow_backend.Shared.Infrastructure.Persistence.EntityFrameworkCore.Con
 namespace Mindflow_backend.Journal.Interfaces.Controllers;
 
 [ApiController]
-[Route("journal")]
+[Route("api/v1/journal")]
 [Authorize]
 public sealed class JournalController(IMediator mediator, IFileStorageService fileStorage, AppDbContext dbContext) : ControllerBase
 {

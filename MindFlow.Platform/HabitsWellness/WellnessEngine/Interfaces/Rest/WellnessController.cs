@@ -5,7 +5,7 @@ using Mindflow_backend.WellnessEngine.Application.Services;
 namespace Mindflow_backend.WellnessEngine.Interfaces.Rest;
 
 [ApiController]
-[Route("wellness")]
+[Route("api/v1/wellness")]
 [Authorize]
 public sealed class WellnessController(IWellnessService wellnessService) : ControllerBase
 {
