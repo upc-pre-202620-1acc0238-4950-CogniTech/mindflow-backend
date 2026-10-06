@@ -177,7 +177,7 @@ builder.Services.AddScoped<IAnalyticsCacheInvalidator, AnalyticsCacheInvalidator
 builder.Services.AddHostedService<JournalSearchBackfillService>();
 
 builder.Services.AddScoped<IChatService, ChatService>();
-builder.Services.AddHttpClient("Gemini", c => c.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddHttpClient("Gemini", c => c.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddScoped<IAiService, GeminiService>();
 builder.Services.AddScoped<IAiFeedbackService, AiFeedbackService>();
 
