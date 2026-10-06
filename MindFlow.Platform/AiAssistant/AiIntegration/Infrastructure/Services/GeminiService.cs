@@ -14,7 +14,7 @@ public class GeminiService(
     AppDbContext dbContext) : IAiService
 {
     private string ApiBase =>
-        $"https://generativelanguage.googleapis.com/v1beta/models/{configuration["AiSettings:GeminiModel"] ?? "gemini-2.0-flash"}:generateContent";
+        $"https://generativelanguage.googleapis.com/v1beta/models/{configuration["AiSettings:GeminiModel"] ?? "gemini-3.8-flash"}:generateContent";
 
     public async Task<string> GenerateEmpathicResponseAsync(string content, string sentiment)
     {
