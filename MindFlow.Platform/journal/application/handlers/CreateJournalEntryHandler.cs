@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Cortex.Mediator.Commands;
 using Mindflow_backend.AiIntegration.Application.Services;
 using Mindflow_backend.Analytics.Application.Services;
@@ -17,13 +18,20 @@ public class CreateJournalEntryHandler(
     IJournalSearchIndexer searchIndexer,
     IAiService aiService) : ICommandHandler<CreateJournalEntryCommand, Result<JournalEntryDto>>
 {
-    private static readonly string[] PositiveWords =
-        ["feliz", "bien", "genial", "excelente", "alegre", "contento", "motivado", "logré",
-         "happy", "great", "good", "amazing", "wonderful"];
+    // Prefijos: cubren conjugaciones/género ("agotad" -> agotado/agotada) comparando contra
+    // tokens completos, nunca contra el texto crudo.
+    private static readonly string[] PositiveStems =
+        ["feliz", "genial", "excelente", "alegre", "content", "motivad", "logré", "logre",
+         "happy", "great", "amazing", "wonderful"];
 
-    private static readonly string[] NegativeWords =
-        ["triste", "mal", "terrible", "ansioso", "estresado", "frustrado", "agotado",
-         "sad", "bad", "stressed", "anxious", "exhausted", "frustrated"];
+    private static readonly string[] NegativeStems =
+        ["triste", "terribl", "ansios", "estresad", "frustrad", "agotad",
+         "sad", "stress", "anxious", "exhaust", "frustrat"];
+
+    // Palabras cortas que calzarían como prefijo de palabras no relacionadas
+    // ("mal" en "normal"/"animal", "bien" en "también"), así que exigimos token exacto.
+    private static readonly string[] PositiveExact = ["bien", "good"];
+    private static readonly string[] NegativeExact = ["mal", "bad"];
 
     public async Task<Result<JournalEntryDto>> Handle(CreateJournalEntryCommand request, CancellationToken ct)
     {
@@ -32,10 +40,7 @@ public class CreateJournalEntryHandler(
         if (string.IsNullOrWhiteSpace(sentiment)
             || string.Equals(sentiment, "auto", StringComparison.OrdinalIgnoreCase))
         {
-            var text = $"{request.Content} {request.Title}".ToLowerInvariant();
-            sentiment = PositiveWords.Any(text.Contains) ? "positive"
-                      : NegativeWords.Any(text.Contains) ? "negative"
-                      : "neutral";
+            sentiment = DetectSentiment($"{request.Content} {request.Title}");
         }
 
         var aiResponse = await aiService.GenerateEmpathicResponseAsync(request.Content, sentiment);
@@ -58,6 +63,20 @@ public class CreateJournalEntryHandler(
         await searchIndexer.IndexAsync(entry, ct);
 
         return Result<JournalEntryDto>.Success(Map(entry));
+    }
+
+    private static string DetectSentiment(string text)
+    {
+        var tokens = Regex.Matches(text.ToLowerInvariant(), @"[\p{L}]+").Select(m => m.Value).ToArray();
+
+        var positives = PositiveStems.Count(stem => tokens.Any(t => t.StartsWith(stem, StringComparison.Ordinal)))
+            + PositiveExact.Count(tokens.Contains);
+        var negatives = NegativeStems.Count(stem => tokens.Any(t => t.StartsWith(stem, StringComparison.Ordinal)))
+            + NegativeExact.Count(tokens.Contains);
+
+        return positives > negatives ? "positive"
+             : negatives > positives ? "negative"
+             : "neutral";
     }
 
     private static JournalEntryDto Map(JournalEntry e) => new()
