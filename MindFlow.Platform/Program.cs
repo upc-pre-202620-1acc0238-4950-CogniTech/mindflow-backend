@@ -227,11 +227,25 @@ builder.Services.AddSingleton<ISearchTokenHasher>(new SearchTokenHasher(searchIn
 builder.Services.AddCortexMediator([typeof(Program)]);
 
 var app = builder.Build();
+var useEnsureCreated = string.Equals(
+    builder.Configuration["Database:SchemaInitialization"],
+    "EnsureCreated",
+    StringComparison.OrdinalIgnoreCase);
 
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    context.Database.Migrate();
+
+    // Some shared MariaDB hosts do not support the migration lock used by the
+    // MySQL EF Core provider. Use this only for a new, disposable database.
+    if (useEnsureCreated)
+    {
+        context.Database.EnsureCreated();
+    }
+    else
+    {
+        context.Database.Migrate();
+    }
 
     if (!await context.WellnessExercises.AnyAsync())
     {
