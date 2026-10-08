@@ -315,12 +315,20 @@ app.UseAuthorization();
 app.UseRateLimiter();
 app.MapControllers();
 
-app.MapGet("/health", async (AppDbContext db) =>
+app.MapGet("/health", async (AppDbContext db, ILogger<Program> logger) =>
 {
-    var canConnect = await db.Database.CanConnectAsync();
-    return canConnect
-        ? Results.Ok(new { status = "ok", database = "connected" })
-        : Results.Problem("Database unreachable.", statusCode: StatusCodes.Status503ServiceUnavailable);
+    try
+    {
+        var canConnect = await db.Database.CanConnectAsync();
+        return canConnect
+            ? Results.Ok(new { status = "ok", database = "connected" })
+            : Results.Problem("Database unreachable.", statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (Exception exception)
+    {
+        logger.LogError(exception, "Health check could not connect to the database.");
+        return Results.Problem("Database health check failed.", statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
 });
 
 app.Run();
