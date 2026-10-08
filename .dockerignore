@@ -1,0 +1,24 @@
+# Build outputs and local tooling
+**/bin/
+**/obj/
+.vs/
+.idea/
+.vscode/
+
+# Git metadata and local runtime artifacts
+.git/
+.gitignore
+**/*.user
+**/*.suo
+**/*.db
+**/*.log
+
+# Local configuration and secrets
+appsettings.Development.json
+secrets.json
+.env
+.env.*
+
+# Documentation and local containers are not required to build the API image
+README.md
+docker-compose.yml
