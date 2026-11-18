@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Mindflow_backend.Analytics.Application.Services;
 using Mindflow_backend.AiFeedback.Application.Services;
 using Mindflow_backend.AiFeedback.Infrastructure.Services;
 using Mindflow_backend.AiIntegration.Application.Services;
@@ -173,11 +172,11 @@ builder.Services.AddHttpClient("Stripe", client => client.BaseAddress = new Uri(
 
 builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
 builder.Services.AddScoped<IJournalSearchIndexer, JournalSearchIndexer>();
-builder.Services.AddScoped<IAnalyticsCacheInvalidator, AnalyticsCacheInvalidatorStub>();
 builder.Services.AddHostedService<JournalSearchBackfillService>();
 
 builder.Services.AddScoped<IChatService, ChatService>();
-builder.Services.AddHttpClient("Gemini", c => c.Timeout = TimeSpan.FromSeconds(60));
+// 25 s por intento (+1 reintento): el peor caso (~52 s) queda por debajo del timeout de lectura de 90 s de Android
+builder.Services.AddHttpClient("Gemini", c => c.Timeout = TimeSpan.FromSeconds(25));
 builder.Services.AddScoped<IAiService, GeminiService>();
 builder.Services.AddScoped<IAiFeedbackService, AiFeedbackService>();
 
@@ -310,7 +309,6 @@ if (swaggerEnabled)
 }
 
 app.UseCors("AllowFrontendPolicy");
-app.UseStaticFiles();
 
 app.UseHttpsRedirection();
 app.UseAuthentication();

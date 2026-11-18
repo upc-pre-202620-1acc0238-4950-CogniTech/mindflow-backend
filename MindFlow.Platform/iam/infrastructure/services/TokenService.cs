@@ -26,7 +26,7 @@ public class TokenService(IConfiguration configuration) : ITokenService
             issuer: configuration["Jwt:Issuer"] ?? "MindFlow.API",
             audience: configuration["Jwt:Audience"] ?? "MindFlow.Frontend",
             claims: claims,
-            expires: DateTime.UtcNow.AddDays(7),
+            expires: DateTime.UtcNow.AddMinutes(configuration.GetValue("TokenSettings:ExpirationMinutes", 10080)),
             signingCredentials: credentials
         );
 

@@ -71,7 +71,7 @@ public class HabitsController : ControllerBase
         return resources;
     }
 
-    public static string HabitsListCacheKey(int userId) => $"habits:list:{userId}";
+    public static string HabitsListCacheKey(int userId) => HabitsCacheKeys.List(userId);
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetHabitById(int id, CancellationToken cancellationToken)
@@ -179,8 +179,10 @@ public class HabitsController : ControllerBase
         var habitNames = habits.Select(h => h.Name).ToList();
         var habitIds = habits.Select(h => h.Id).ToList();
 
+        // Tasa de la última semana (antes contaba todo el historial y se saturaba en 100 %)
+        var since = DateTime.UtcNow.Date.AddDays(-6);
         var totalLogs = await _dbContext.Set<HabitCompletionLog>()
-            .CountAsync(l => habitIds.Contains(l.HabitId), cancellationToken);
+            .CountAsync(l => habitIds.Contains(l.HabitId) && l.Completed && l.Date >= since, cancellationToken);
         var completionRate = habitIds.Count > 0 ? (int)((double)totalLogs / (habitIds.Count * 7) * 100) : 0;
         if (completionRate > 100) completionRate = 100;
 

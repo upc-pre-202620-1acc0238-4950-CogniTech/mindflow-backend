@@ -6,6 +6,7 @@ using Mindflow_backend.iam.domain.model.commands;
 using Mindflow_backend.iam.interfaces.rest.resources;
 using Mindflow_backend.iam.interfaces.rest.transform;
 
+using Mindflow_backend.Shared.Infrastructure.Security;
 namespace Mindflow_backend.iam.interfaces.rest;
 
 [ApiController]
@@ -24,7 +25,7 @@ public class UsersController(IUserCommandService userCommandService) : Controlle
             return BadRequest(new { error = result.Message });
 
         var userResource = UserResourceFromEntityAssembler.ToResourceFromEntity(result.Value!);
-        return CreatedAtAction(nameof(SignUp), new { id = userResource.Id }, userResource);
+        return Created("api/v1/users/profile", userResource);
     }
 
     [HttpPost("sign-in")]
@@ -78,7 +79,7 @@ public class UsersController(IUserCommandService userCommandService) : Controlle
     [Authorize]
     public async Task<IActionResult> GetProfile()
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
         var result = await userCommandService.GetProfileAsync(userId);
 
         if (result.IsFailure)
@@ -91,7 +92,7 @@ public class UsersController(IUserCommandService userCommandService) : Controlle
     [Authorize]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileResource resource)
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
         var command = new UpdateProfileCommand(userId, resource.Name, resource.Occupation);
         var result = await userCommandService.Handle(command);
 
@@ -105,7 +106,7 @@ public class UsersController(IUserCommandService userCommandService) : Controlle
     [Authorize]
     public async Task<IActionResult> DeleteAccount()
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
         var command = new DeleteAccountCommand(userId);
         var result = await userCommandService.Handle(command);
 
@@ -119,7 +120,7 @@ public class UsersController(IUserCommandService userCommandService) : Controlle
     [Authorize]
     public async Task<IActionResult> SetPin([FromBody] SetPinResource resource)
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
         var command = new SetPinCommand(userId, resource.Pin);
         var result = await userCommandService.Handle(command);
 
@@ -134,7 +135,7 @@ public class UsersController(IUserCommandService userCommandService) : Controlle
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> VerifyPin([FromBody] VerifyPinResource resource)
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
         var command = new VerifyPinCommand(userId, resource.Pin);
         var result = await userCommandService.Handle(command);
 
@@ -148,7 +149,7 @@ public class UsersController(IUserCommandService userCommandService) : Controlle
     [Authorize]
     public async Task<IActionResult> RemovePin()
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
         var command = new RemovePinCommand(userId);
         var result = await userCommandService.Handle(command);
 
@@ -162,7 +163,7 @@ public class UsersController(IUserCommandService userCommandService) : Controlle
     [Authorize]
     public async Task<IActionResult> PinStatus()
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
         var hasPin = await userCommandService.HasPinAsync(userId);
         return Ok(new { has_pin = hasPin });
     }

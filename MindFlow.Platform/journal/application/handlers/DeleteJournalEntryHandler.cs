@@ -1,5 +1,4 @@
 using Cortex.Mediator.Commands;
-using Mindflow_backend.Analytics.Application.Services;
 using Mindflow_backend.Journal.Application.Commands;
 using Mindflow_backend.Journal.Domain.Entities;
 using Mindflow_backend.Shared.Application.Model;
@@ -10,8 +9,7 @@ namespace Mindflow_backend.Journal.Application.Handlers;
 
 public class DeleteJournalEntryHandler(
     IBaseRepository<JournalEntry> repository,
-    IUnitOfWork unitOfWork,
-    IAnalyticsCacheInvalidator cacheInvalidator) : ICommandHandler<DeleteJournalEntryCommand, Result>
+    IUnitOfWork unitOfWork) : ICommandHandler<DeleteJournalEntryCommand, Result>
 {
     public async Task<Result> Handle(DeleteJournalEntryCommand request, CancellationToken ct)
     {
@@ -23,7 +21,6 @@ public class DeleteJournalEntryHandler(
         entry.DeletedAt = DateTimeOffset.UtcNow;
         repository.Update(entry);
         await unitOfWork.CompleteAsync(ct);
-        await cacheInvalidator.InvalidateAsync(entry.UserId, entry.Date, ct);
 
         return Result.Success();
     }

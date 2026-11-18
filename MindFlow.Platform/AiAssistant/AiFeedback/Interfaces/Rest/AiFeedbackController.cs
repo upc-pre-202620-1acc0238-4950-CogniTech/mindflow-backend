@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Mindflow_backend.AiFeedback.Application.Services;
 
+using Mindflow_backend.Shared.Infrastructure.Security;
 namespace Mindflow_backend.AiFeedback.Interfaces.Rest;
 
 [ApiController]
@@ -9,7 +10,7 @@ namespace Mindflow_backend.AiFeedback.Interfaces.Rest;
 [Authorize]
 public class AiFeedbackController(IAiFeedbackService feedbackService) : ControllerBase
 {
-    private int CurrentUserId => int.Parse(User.FindFirst("user_id")!.Value);
+    private int CurrentUserId => User.GetUserId();
 
     [HttpPost]
     public async Task<IActionResult> SubmitRating([FromBody] SubmitRatingRequest request)

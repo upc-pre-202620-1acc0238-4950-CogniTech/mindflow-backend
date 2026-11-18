@@ -20,7 +20,7 @@ public sealed class WellnessExercisesController(IMediator mediator) : Controller
     public async Task<IActionResult> GetActiveExercises([FromQuery] string? type)
     {
         var result = await mediator.QueryAsync(new GetActiveWellnessExercisesQuery { Type = type });
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Message);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Message });
     }
 
     [HttpGet("all")]
@@ -28,7 +28,7 @@ public sealed class WellnessExercisesController(IMediator mediator) : Controller
     public async Task<IActionResult> GetAllExercises([FromQuery] string? type)
     {
         var result = await mediator.QueryAsync(new GetAllWellnessExercisesQuery { Type = type });
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Message);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Message });
     }
 
     [HttpGet("{id}")]
@@ -36,7 +36,7 @@ public sealed class WellnessExercisesController(IMediator mediator) : Controller
     public async Task<IActionResult> GetExerciseById(int id)
     {
         var result = await mediator.QueryAsync(new GetWellnessExerciseByIdQuery { Id = id });
-        return result.IsSuccess ? Ok(result.Value) : NotFound(result.Message);
+        return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Message });
     }
 
     [HttpPost]
@@ -61,7 +61,7 @@ public sealed class WellnessExercisesController(IMediator mediator) : Controller
         var result = await mediator.SendAsync(command);
         return result.IsSuccess
             ? CreatedAtAction(nameof(GetExerciseById), new { id = result.Value!.Id }, result.Value)
-            : BadRequest(result.Message);
+            : BadRequest(new { error = result.Message });
     }
 
     [HttpPut("{id}")]
@@ -85,7 +85,7 @@ public sealed class WellnessExercisesController(IMediator mediator) : Controller
             SortOrder = request.SortOrder
         };
         var result = await mediator.SendAsync(command);
-        return result.IsSuccess ? Ok(result.Value) : NotFound(result.Message);
+        return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Message });
     }
 
     [HttpDelete("{id}")]
@@ -93,6 +93,6 @@ public sealed class WellnessExercisesController(IMediator mediator) : Controller
     public async Task<IActionResult> DeleteExercise(int id)
     {
         var result = await mediator.SendAsync(new DeleteWellnessExerciseCommand { Id = id });
-        return result.IsSuccess ? Ok() : NotFound(result.Message);
+        return result.IsSuccess ? NoContent() : NotFound(new { error = result.Message });
     }
 }

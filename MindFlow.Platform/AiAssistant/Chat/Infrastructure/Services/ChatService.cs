@@ -40,17 +40,7 @@ public class ChatService(
         await unitOfWork.CompleteAsync(ct);
 
         var aiResponseText = await aiService.GenerateChatResponseAsync([("user", content)]);
-        if (string.IsNullOrEmpty(aiResponseText))
-            aiResponseText = FallbackResponse;
-
-        var aiMessage = new ChatMessage
-        {
-            ConversationId = conversation.Id,
-            Role = "assistant",
-            Content = aiResponseText
-        };
-        db.ChatMessages.Add(aiMessage);
-        await unitOfWork.CompleteAsync(ct);
+        var aiMessage = await SaveAssistantMessageAsync(conversation.Id, aiResponseText, ct);
 
         logger.LogInformation("Conversation {ConversationId} created for user {UserId}.", conversation.Id, userId);
 
@@ -141,17 +131,7 @@ public class ChatService(
         var history = recentMessages.Select(m => (m.Role, m.Content)).ToList();
 
         var aiResponseText = await aiService.GenerateChatResponseAsync(history);
-        if (string.IsNullOrEmpty(aiResponseText))
-            aiResponseText = FallbackResponse;
-
-        var aiMessage = new ChatMessage
-        {
-            ConversationId = conversationId,
-            Role = "assistant",
-            Content = aiResponseText
-        };
-        db.ChatMessages.Add(aiMessage);
-        await unitOfWork.CompleteAsync(ct);
+        var aiMessage = await SaveAssistantMessageAsync(conversationId, aiResponseText, ct);
 
         return new SendMessageResponseDto
         {
@@ -179,6 +159,21 @@ public class ChatService(
             CreatedAt = conversation.CreatedAt,
             Messages = conversation.Messages.Select(ToDto).ToList()
         };
+    }
+
+    /// <summary>
+    ///     Guarda la respuesta de la IA. Si Gemini falló se devuelve el texto de respaldo
+    ///     pero NO se persiste: así no contamina el historial que se reenvía a Gemini.
+    /// </summary>
+    private async Task<ChatMessage> SaveAssistantMessageAsync(int conversationId, string? text, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(text))
+            return new ChatMessage { Id = 0, ConversationId = conversationId, Role = "assistant", Content = FallbackResponse, CreatedAt = DateTimeOffset.UtcNow };
+
+        var message = new ChatMessage { ConversationId = conversationId, Role = "assistant", Content = text };
+        db.ChatMessages.Add(message);
+        await unitOfWork.CompleteAsync(ct);
+        return message;
     }
 
     private static ChatMessageDto ToDto(ChatMessage m) => new()

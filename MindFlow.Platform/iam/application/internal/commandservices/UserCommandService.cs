@@ -20,6 +20,8 @@ public class UserCommandService(
     AppDbContext dbContext,
     IGoogleAuthService googleAuthService,
     IEmailService emailService,
+    IHttpClientFactory httpClientFactory,
+    IConfiguration configuration,
     ILogger<UserCommandService> logger) : IUserCommandService
 {
     private static string HashResetToken(string rawToken) =>
@@ -81,6 +83,8 @@ public class UserCommandService(
         if (user == null)
             return Result.Failure(SignUpError.UnexpectedError, "Usuario no encontrado.");
 
+        await CancelStripeSubscriptionAsync(command.UserId);
+
         await using var transaction = await dbContext.Database.BeginTransactionAsync();
 
         var entryIds = await dbContext.JournalEntries
@@ -128,11 +132,45 @@ public class UserCommandService(
         await dbContext.CachedHabitSuggestions.Where(c => c.UserId == command.UserId).ExecuteDeleteAsync();
         await dbContext.PasswordResetTokens.Where(t => t.UserId == command.UserId).ExecuteDeleteAsync();
         await dbContext.Tags.Where(t => t.UserId == command.UserId).ExecuteDeleteAsync();
+        await dbContext.Subscriptions.Where(s => s.UserId == command.UserId).ExecuteDeleteAsync();
+        await dbContext.Notifications.Where(n => n.UserId == command.UserId).ExecuteDeleteAsync();
+        // Los mensajes del ticket caen por la FK con borrado en cascada
+        await dbContext.SupportTickets.Where(t => t.OwnerId == command.UserId).ExecuteDeleteAsync();
 
         userRepository.Remove(user);
         await unitOfWork.CompleteAsync();
         await transaction.CommitAsync();
         return Result.Success();
+    }
+
+    /// <summary>
+    ///     Best effort: cancela la suscripción en Stripe para que no se siga cobrando a una cuenta borrada.
+    ///     Si Stripe no está configurado o falla, el borrado de la cuenta continúa igualmente.
+    /// </summary>
+    private async Task CancelStripeSubscriptionAsync(int userId)
+    {
+        var secret = configuration["Stripe:SecretKey"];
+        if (string.IsNullOrWhiteSpace(secret)) return;
+
+        try
+        {
+            var stripeId = await dbContext.Subscriptions
+                .Where(s => s.UserId == userId)
+                .Select(s => s.StripeSubscriptionId)
+                .FirstOrDefaultAsync();
+            if (string.IsNullOrWhiteSpace(stripeId)) return;
+
+            using var request = new HttpRequestMessage(HttpMethod.Delete, $"v1/subscriptions/{Uri.EscapeDataString(stripeId)}");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{secret}:")));
+            using var response = await httpClientFactory.CreateClient("Stripe").SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                logger.LogWarning("Stripe subscription cancel returned {StatusCode} for user {UserId}.", (int)response.StatusCode, userId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not cancel the Stripe subscription for user {UserId}.", userId);
+        }
     }
 
     public async Task<Result<(User User, string Token)>> Handle(GoogleAuthCommand command)
@@ -199,6 +237,9 @@ public class UserCommandService(
 
     public async Task<Result> Handle(ResetPasswordCommand command)
     {
+        if (string.IsNullOrWhiteSpace(command.NewPassword) || command.NewPassword.Length < 8)
+            return Result.Failure(SignUpError.UnexpectedError, "La contraseña debe tener al menos 8 caracteres.");
+
         var tokenHash = HashResetToken(command.Token);
         var resetToken = await dbContext.PasswordResetTokens
             .FirstOrDefaultAsync(t => t.Token == tokenHash && !t.Used);

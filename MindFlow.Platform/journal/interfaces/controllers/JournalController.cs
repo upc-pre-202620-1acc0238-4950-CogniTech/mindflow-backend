@@ -1,4 +1,5 @@
 using Cortex.Mediator;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +9,7 @@ using Mindflow_backend.Journal.Application.Queries;
 using Mindflow_backend.Journal.Application.Services;
 using Mindflow_backend.Shared.Infrastructure.Persistence.EntityFrameworkCore.Configuration;
 
+using Mindflow_backend.Shared.Infrastructure.Security;
 namespace Mindflow_backend.Journal.Interfaces.Controllers;
 
 [ApiController]
@@ -22,7 +24,7 @@ public sealed class JournalController(IMediator mediator, IFileStorageService fi
     [FromQuery(Name = "_limit")] int? limit,
     [FromQuery(Name = "q")] string? q)
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
         var query = new GetJournalEntriesQuery
         {
             UserId = userId,
@@ -32,17 +34,17 @@ public sealed class JournalController(IMediator mediator, IFileStorageService fi
             Q = q
         };
         var result = await mediator.QueryAsync(query);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Message);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Message });
     }
 
     [HttpGet("entries/{id}")]
     public async Task<IActionResult> GetEntryById(int id)
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
         var query = new GetJournalEntryByIdQuery { Id = id };
         var result = await mediator.QueryAsync(query);
         if (!result.IsSuccess)
-            return NotFound(result.Message);
+            return NotFound(new { error = result.Message });
         if (result.Value!.UserId != userId)
             return NotFound();
         return Ok(result.Value);
@@ -51,7 +53,7 @@ public sealed class JournalController(IMediator mediator, IFileStorageService fi
     [HttpPost("entries")]
     public async Task<IActionResult> CreateEntry([FromBody] CreateJournalEntryRequest request)
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
         var command = new CreateJournalEntryCommand
         {
             UserId = userId,
@@ -62,13 +64,13 @@ public sealed class JournalController(IMediator mediator, IFileStorageService fi
             Category = request.Category
         };
         var result = await mediator.SendAsync(command);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Message);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Message });
     }
 
     [HttpPut("entries/{id}")]
     public async Task<IActionResult> UpdateEntry(int id, [FromBody] UpdateJournalEntryRequest request)
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
 
         var entryQuery = new GetJournalEntryByIdQuery { Id = id };
         var entryResult = await mediator.QueryAsync(entryQuery);
@@ -84,22 +86,22 @@ public sealed class JournalController(IMediator mediator, IFileStorageService fi
             Category = request.Category
         };
         var result = await mediator.SendAsync(command);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Message);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Message });
     }
 
     [HttpPost("entries/sync")]
     public async Task<IActionResult> SyncEntries([FromBody] List<SyncJournalEntryItemRequest> items)
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
         var command = new SyncJournalEntriesCommand { UserId = userId, Items = items };
         var result = await mediator.SendAsync(command);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Message);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Message });
     }
 
     [HttpDelete("entries/{id}")]
     public async Task<IActionResult> DeleteEntry(int id)
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
 
         var entryQuery = new GetJournalEntryByIdQuery { Id = id };
         var entryResult = await mediator.QueryAsync(entryQuery);
@@ -108,22 +110,42 @@ public sealed class JournalController(IMediator mediator, IFileStorageService fi
 
         var command = new DeleteJournalEntryCommand { Id = id };
         var result = await mediator.SendAsync(command);
-        return result.IsSuccess ? Ok() : BadRequest(result.Message);
+        return result.IsSuccess ? NoContent() : BadRequest(new { error = result.Message });
     }
 
     [HttpGet("tags")]
     public async Task<IActionResult> GetTags()
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
         var query = new GetTagsQuery { UserId = userId };
         var result = await mediator.QueryAsync(query);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Message);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Message });
+    }
+
+    [HttpPost("tags")]
+    public async Task<IActionResult> CreateTag([FromBody] CreateTagRequest request)
+    {
+        var userId = User.GetUserId();
+        var name = request.Name.Trim();
+        if (name.Length == 0)
+            return BadRequest(new { error = "El nombre de la etiqueta es obligatorio." });
+
+        var existing = await dbContext.Tags
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.UserId == userId && t.Name == name);
+        if (existing is not null)
+            return Ok(new TagDto { Id = existing.Id, UserId = existing.UserId, Name = existing.Name });
+
+        var tag = new Mindflow_backend.Journal.Domain.Entities.Tag { UserId = userId, Name = name };
+        dbContext.Tags.Add(tag);
+        await dbContext.SaveChangesAsync();
+        return Created($"api/v1/journal/tags/{tag.Id}", new TagDto { Id = tag.Id, UserId = tag.UserId, Name = tag.Name });
     }
 
     [HttpGet("entry-tags")]
     public async Task<IActionResult> GetEntryTags([FromQuery] int? entryId)
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
 
         if (entryId.HasValue)
         {
@@ -135,27 +157,32 @@ public sealed class JournalController(IMediator mediator, IFileStorageService fi
 
         var query = new GetEntryTagsQuery { UserId = userId, EntryId = entryId };
         var result = await mediator.QueryAsync(query);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Message);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Message });
     }
 
     [HttpPost("entry-tags")]
     public async Task<IActionResult> CreateEntryTag([FromBody] CreateEntryTagCommand command)
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
 
         var entryQuery = new GetJournalEntryByIdQuery { Id = command.EntryId };
         var entryResult = await mediator.QueryAsync(entryQuery);
         if (!entryResult.IsSuccess || entryResult.Value!.UserId != userId)
             return NotFound();
 
+        // La etiqueta también debe ser del usuario (evita usar o leer etiquetas ajenas por id)
+        var tagIsOwned = await dbContext.Tags.AnyAsync(t => t.Id == command.TagId && t.UserId == userId);
+        if (!tagIsOwned)
+            return NotFound();
+
         var result = await mediator.SendAsync(command);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Message);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Message });
     }
 
     [HttpDelete("entry-tags/{id}")]
     public async Task<IActionResult> DeleteEntryTag(int id)
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
 
         var entryTag = await dbContext.EntryTags
             .AsNoTracking()
@@ -171,13 +198,13 @@ public sealed class JournalController(IMediator mediator, IFileStorageService fi
 
         var command = new DeleteEntryTagCommand { Id = id };
         var result = await mediator.SendAsync(command);
-        return result.IsSuccess ? Ok() : BadRequest(result.Message);
+        return result.IsSuccess ? NoContent() : BadRequest(new { error = result.Message });
     }
 
     [HttpGet("media")]
     public async Task<IActionResult> GetMedia([FromQuery] int? entryId)
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
 
         if (entryId.HasValue)
         {
@@ -189,13 +216,13 @@ public sealed class JournalController(IMediator mediator, IFileStorageService fi
 
         var query = new GetMediaQuery { UserId = userId, EntryId = entryId };
         var result = await mediator.QueryAsync(query);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Message);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Message });
     }
 
     [HttpPost("media")]
     public async Task<IActionResult> CreateMedia([FromBody] CreateMediaCommand command)
     {
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
 
         var entryQuery = new GetJournalEntryByIdQuery { Id = command.EntryId };
         var entryResult = await mediator.QueryAsync(entryQuery);
@@ -203,7 +230,7 @@ public sealed class JournalController(IMediator mediator, IFileStorageService fi
             return NotFound();
 
         var result = await mediator.SendAsync(command);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Message);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Message });
     }
 
     [HttpPost("media/upload")]
@@ -213,7 +240,7 @@ public sealed class JournalController(IMediator mediator, IFileStorageService fi
         if (file == null || file.Length == 0)
             return BadRequest(new { error = "No se proporcionó ningún archivo." });
 
-        var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var userId = User.GetUserId();
 
         var entryQuery = new GetJournalEntryByIdQuery { Id = entryId };
         var entryResult = await mediator.QueryAsync(entryQuery);
@@ -225,7 +252,7 @@ public sealed class JournalController(IMediator mediator, IFileStorageService fi
             var (url, type) = await fileStorage.SaveAsync(file, userId);
             var command = new CreateMediaCommand { EntryId = entryId, Type = type, Url = url };
             var result = await mediator.SendAsync(command);
-            return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Message);
+            return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Message });
         }
         catch (InvalidOperationException ex)
         {
@@ -233,3 +260,5 @@ public sealed class JournalController(IMediator mediator, IFileStorageService fi
         }
     }
 }
+
+public record CreateTagRequest([Required, MaxLength(50)] string Name);

@@ -33,6 +33,11 @@ public class GlobalExceptionHandlerMiddleware(
             logger.LogWarning(ex, "Request was cancelled: {Method} {Path}", context.Request.Method, context.Request.Path);
             await HandleOperationCanceledExceptionAsync(context, ex);
         }
+        catch (ArgumentException ex)
+        {
+            logger.LogWarning(ex, "Invalid request: {Method} {Path}", context.Request.Method, context.Request.Path);
+            await HandleBadRequestAsync(context, ex);
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Unhandled exception on {Method} {Path}", context.Request.Method, context.Request.Path);
@@ -65,6 +70,24 @@ public class GlobalExceptionHandlerMiddleware(
         var result = JsonSerializer.Serialize(problemDetails, jsonOptions);
 
         await context.Response.WriteAsync(result);
+    }
+
+    private static async Task HandleBadRequestAsync(HttpContext context, ArgumentException exception)
+    {
+        context.Response.ContentType = MediaTypeNames.Application.Json;
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+        var problemDetails = new ProblemDetails
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "Bad Request",
+            Detail = exception.Message,
+            Instance = context.Request.Path
+        };
+        problemDetails.Extensions["traceId"] = GetCorrelationId(context);
+
+        var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+        await context.Response.WriteAsync(JsonSerializer.Serialize(problemDetails, jsonOptions));
     }
 
     private async Task HandleGenericExceptionAsync(HttpContext context, Exception exception)

@@ -6,13 +6,15 @@ using Mindflow_backend.Shared.Domain.Repositories;
 using Mindflow_backend.Shared.Infrastructure.Persistence.EntityFrameworkCore.Configuration;
 using Mindflow_backend.WellnessEngine.Application.Dtos;
 
+using Mindflow_backend.Shared.Infrastructure.Caching;
 namespace Mindflow_backend.WellnessEngine.Application.Services;
 
 public class WellnessService(
     AppDbContext dbContext,
     IHabitRepository habitRepository,
     IUnitOfWork unitOfWork,
-    IAiService aiService) : IWellnessService
+    IAiService aiService,
+    ICacheService cache) : IWellnessService
 {
     public async Task<StressCheckResultDto> RunStressCheckAsync(int userId, CancellationToken ct = default)
     {
@@ -65,7 +67,11 @@ public class WellnessService(
         }
 
         if (changed)
+        {
             await unitOfWork.CompleteAsync(ct);
+            // La lista de hábitos está en caché (2 min): sin esto se verían estados viejos
+            await cache.RemoveAsync(HabitsCacheKeys.List(userId), ct);
+        }
 
         var habitNames = habits.Select(h => h.Name);
         var geminiAdvice = await aiService.GenerateStressAdviceAsync(stressLevel, score, entries.Count, habitNames);

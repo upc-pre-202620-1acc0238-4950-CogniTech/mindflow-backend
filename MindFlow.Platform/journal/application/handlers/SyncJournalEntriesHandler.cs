@@ -1,6 +1,5 @@
 using Cortex.Mediator.Commands;
 using Microsoft.EntityFrameworkCore;
-using Mindflow_backend.Analytics.Application.Services;
 using Mindflow_backend.Journal.Application.Commands;
 using Mindflow_backend.Journal.Application.Dtos;
 using Mindflow_backend.Journal.Application.Services;
@@ -17,7 +16,6 @@ namespace Mindflow_backend.Journal.Application.Handlers;
 /// </summary>
 public class SyncJournalEntriesHandler(
     AppDbContext dbContext,
-    IAnalyticsCacheInvalidator cacheInvalidator,
     IJournalSearchIndexer searchIndexer)
     : ICommandHandler<SyncJournalEntriesCommand, Result<List<SyncJournalEntryResultDto>>>
 {
@@ -76,7 +74,6 @@ public class SyncJournalEntriesHandler(
 
         dbContext.JournalEntries.Add(entry);
         await dbContext.SaveChangesAsync(ct);
-        await cacheInvalidator.InvalidateAsync(userId, entry.Date, ct);
         await searchIndexer.IndexAsync(entry, ct);
 
         return new SyncJournalEntryResultDto { ClientId = item.ClientId, Action = "created", Entry = Map(entry) };
@@ -89,7 +86,6 @@ public class SyncJournalEntriesHandler(
             entry.DeletedAt = DateTimeOffset.UtcNow;
             dbContext.JournalEntries.Update(entry);
             await dbContext.SaveChangesAsync(ct);
-            await cacheInvalidator.InvalidateAsync(userId, entry.Date, ct);
         }
 
         return new SyncJournalEntryResultDto { ClientId = clientId, Action = "deleted" };
@@ -108,7 +104,6 @@ public class SyncJournalEntriesHandler(
 
         dbContext.JournalEntries.Update(entry);
         await dbContext.SaveChangesAsync(ct);
-        await cacheInvalidator.InvalidateAsync(userId, entry.Date, ct);
         await searchIndexer.IndexAsync(entry, ct);
 
         return new SyncJournalEntryResultDto { ClientId = item.ClientId, Action = "updated", Entry = Map(entry) };

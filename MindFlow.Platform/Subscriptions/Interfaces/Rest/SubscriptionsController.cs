@@ -6,13 +6,14 @@ using Mindflow_backend.Subscriptions.Domain.Entities;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Security.Cryptography;
+using Mindflow_backend.Shared.Infrastructure.Security;
 namespace Mindflow_backend.Subscriptions.Interfaces.Rest;
 [ApiController, Route("api/v1/subscriptions")]
-public sealed class SubscriptionsController(AppDbContext db, IHttpClientFactory clients, IConfiguration configuration, ILogger<SubscriptionsController> logger) : ControllerBase
+public sealed class SubscriptionsController(AppDbContext db, IHttpClientFactory clients, IConfiguration configuration, ILogger<SubscriptionsController> logger, IWebHostEnvironment env) : ControllerBase
 {
     [HttpGet("plans"), AllowAnonymous] public IActionResult Plans() => Ok(new[] { new { id = "freemium", price = 0m, currency = "USD", interval = (string?)null }, new { id = "premium", price = 4.99m, currency = "USD", interval = (string?)"month" } });
     [HttpGet("me"), Authorize] public async Task<IActionResult> Mine(CancellationToken ct) { var userId = Id(); return Ok(await db.Subscriptions.SingleOrDefaultAsync(x => x.UserId == userId, ct) ?? new Subscription { UserId = userId }); }
-    [HttpPost("demo/plan/{plan}"), Authorize] public async Task<IActionResult> DemoPlan(string plan, CancellationToken ct) { if (plan is not ("freemium" or "premium")) return BadRequest(); var userId = Id(); var sub = await db.Subscriptions.SingleOrDefaultAsync(x => x.UserId == userId, ct); if (sub is null) { sub = new Subscription { UserId = userId }; db.Subscriptions.Add(sub); } sub.Plan = plan; sub.Status = "active"; await db.SaveChangesAsync(ct); return Ok(sub); }
+    [HttpPost("demo/plan/{plan}"), Authorize] public async Task<IActionResult> DemoPlan(string plan, CancellationToken ct) { if (!env.IsDevelopment() && !User.IsInRole("Admin")) return NotFound(); if (plan is not ("freemium" or "premium")) return BadRequest(); var userId = Id(); var sub = await db.Subscriptions.SingleOrDefaultAsync(x => x.UserId == userId, ct); if (sub is null) { sub = new Subscription { UserId = userId }; db.Subscriptions.Add(sub); } sub.Plan = plan; sub.Status = "active"; await db.SaveChangesAsync(ct); return Ok(sub); }
     [HttpPost("checkout"), Authorize]
     public async Task<IActionResult> Checkout(CancellationToken ct)
     {
@@ -49,15 +50,39 @@ public sealed class SubscriptionsController(AppDbContext db, IHttpClientFactory 
         if (!ValidSignature(Request.Headers["Stripe-Signature"].ToString(), payload, secret)) return Unauthorized();
         using var document = System.Text.Json.JsonDocument.Parse(payload);
         var root = document.RootElement;
-        if (root.GetProperty("type").GetString() is not "checkout.session.completed") return Ok();
-        var data = root.GetProperty("data").GetProperty("object");
-        if (!data.TryGetProperty("client_reference_id", out var reference) || !int.TryParse(reference.GetString(), out var userId)) return BadRequest();
-        var subscription = await db.Subscriptions.SingleOrDefaultAsync(x => x.UserId == userId, ct);
-        if (subscription is null) { subscription = new Subscription { UserId = userId }; db.Subscriptions.Add(subscription); }
-        subscription.Plan = "premium"; subscription.Status = "active";
-        if (data.TryGetProperty("customer", out var customer)) subscription.StripeCustomerId = customer.GetString();
-        if (data.TryGetProperty("subscription", out var stripeSubscription)) subscription.StripeSubscriptionId = stripeSubscription.GetString();
-        await db.SaveChangesAsync(ct);
+        if (!root.TryGetProperty("type", out var typeElement)
+            || !root.TryGetProperty("data", out var dataElement)
+            || !dataElement.TryGetProperty("object", out var data))
+            return BadRequest();
+
+        switch (typeElement.GetString())
+        {
+            case "checkout.session.completed":
+            {
+                if (!data.TryGetProperty("client_reference_id", out var reference)
+                    || !int.TryParse(reference.GetString(), out var userId)) return BadRequest();
+                var subscription = await db.Subscriptions.SingleOrDefaultAsync(x => x.UserId == userId, ct);
+                if (subscription is null) { subscription = new Subscription { UserId = userId }; db.Subscriptions.Add(subscription); }
+                subscription.Plan = "premium"; subscription.Status = "active";
+                if (data.TryGetProperty("customer", out var customer)) subscription.StripeCustomerId = customer.GetString();
+                if (data.TryGetProperty("subscription", out var stripeSubscription)) subscription.StripeSubscriptionId = stripeSubscription.GetString();
+                await db.SaveChangesAsync(ct);
+                break;
+            }
+            case "customer.subscription.deleted":
+            {
+                // La suscripción se canceló o dejó de pagarse: se revoca Premium.
+                var stripeId = data.TryGetProperty("id", out var idElement) ? idElement.GetString() : null;
+                if (string.IsNullOrWhiteSpace(stripeId)) return BadRequest();
+                var subscription = await db.Subscriptions.SingleOrDefaultAsync(x => x.StripeSubscriptionId == stripeId, ct);
+                if (subscription is not null)
+                {
+                    subscription.Plan = "freemium"; subscription.Status = "canceled";
+                    await db.SaveChangesAsync(ct);
+                }
+                break;
+            }
+        }
         return Ok();
     }
     private static bool ValidSignature(string header, string payload, string secret)
@@ -70,5 +95,5 @@ public sealed class SubscriptionsController(AppDbContext db, IHttpClientFactory 
         var expected = Convert.ToHexString(hash).ToLowerInvariant();
         return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(signature));
     }
-    private int Id() => int.Parse(User.FindFirst("user_id")!.Value);
+    private int Id() => User.GetUserId();
 }

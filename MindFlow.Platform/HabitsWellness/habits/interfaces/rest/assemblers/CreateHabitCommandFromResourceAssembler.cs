@@ -8,8 +8,7 @@ public static class CreateHabitCommandFromResourceAssembler
 {
     public static CreateHabitCommand ToCommandFromResource(CreateHabitResource resource)
     {
-        if (!Enum.TryParse<HabitFrequency>(resource.Frequency, ignoreCase: true, out var frequency))
-            throw new ArgumentException($"Invalid frequency: {resource.Frequency}");
+        var frequency = HabitFrequencyParser.Parse(resource.Frequency);
 
         return new CreateHabitCommand(resource.UserId, resource.Name, resource.Category, frequency);
     }

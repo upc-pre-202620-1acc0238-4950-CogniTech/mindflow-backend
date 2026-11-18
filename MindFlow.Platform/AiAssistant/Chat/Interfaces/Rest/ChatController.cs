@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Mindflow_backend.Chat.Application.Dtos;
 using Mindflow_backend.Chat.Application.Services;
 
+using Mindflow_backend.Shared.Infrastructure.Security;
 namespace Mindflow_backend.Chat.Interfaces.Rest;
 
 [ApiController]
@@ -10,7 +11,7 @@ namespace Mindflow_backend.Chat.Interfaces.Rest;
 [Authorize]
 public class ChatController(IChatService chatService) : ControllerBase
 {
-    private int CurrentUserId => int.Parse(User.FindFirst("user_id")!.Value);
+    private int CurrentUserId => User.GetUserId();
 
     private const int MaxContentLength = 5000;
 
@@ -18,10 +19,10 @@ public class ChatController(IChatService chatService) : ControllerBase
     public async Task<IActionResult> CreateConversation([FromBody] CreateConversationRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Content))
-            return BadRequest(new { message = "El contenido del mensaje es obligatorio." });
+            return BadRequest(new { error = "El contenido del mensaje es obligatorio." });
 
         if (request.Content.Length > MaxContentLength)
-            return BadRequest(new { message = $"El mensaje no puede superar los {MaxContentLength} caracteres." });
+            return BadRequest(new { error = $"El mensaje no puede superar los {MaxContentLength} caracteres." });
 
         var result = await chatService.CreateConversationAsync(
             CurrentUserId, request.Content.Trim(), request.Category?.Trim(), ct);
@@ -46,7 +47,7 @@ public class ChatController(IChatService chatService) : ControllerBase
         }
         catch (KeyNotFoundException)
         {
-            return NotFound(new { message = "Conversación no encontrada." });
+            return NotFound(new { error = "Conversación no encontrada." });
         }
     }
 
@@ -54,10 +55,10 @@ public class ChatController(IChatService chatService) : ControllerBase
     public async Task<IActionResult> SendMessage(int id, [FromBody] SendMessageRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Content))
-            return BadRequest(new { message = "El contenido del mensaje es obligatorio." });
+            return BadRequest(new { error = "El contenido del mensaje es obligatorio." });
 
         if (request.Content.Length > MaxContentLength)
-            return BadRequest(new { message = $"El mensaje no puede superar los {MaxContentLength} caracteres." });
+            return BadRequest(new { error = $"El mensaje no puede superar los {MaxContentLength} caracteres." });
 
         try
         {
@@ -68,7 +69,7 @@ public class ChatController(IChatService chatService) : ControllerBase
         }
         catch (KeyNotFoundException)
         {
-            return NotFound(new { message = "Conversación no encontrada." });
+            return NotFound(new { error = "Conversación no encontrada." });
         }
     }
 
@@ -82,7 +83,7 @@ public class ChatController(IChatService chatService) : ControllerBase
         }
         catch (KeyNotFoundException)
         {
-            return NotFound(new { message = "Conversación no encontrada." });
+            return NotFound(new { error = "Conversación no encontrada." });
         }
     }
 }

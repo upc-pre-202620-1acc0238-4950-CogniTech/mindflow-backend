@@ -8,8 +8,7 @@ public static class UpdateHabitCommandFromResourceAssembler
 {
     public static UpdateHabitCommand ToCommandFromResource(int id, int userId, UpdateHabitResource resource)
     {
-        if (!Enum.TryParse<HabitFrequency>(resource.Frequency, ignoreCase: true, out var frequency))
-            throw new ArgumentException($"Invalid frequency: {resource.Frequency}");
+        var frequency = HabitFrequencyParser.Parse(resource.Frequency);
 
         return new UpdateHabitCommand(id, userId, resource.Name, resource.Category, frequency);
     }

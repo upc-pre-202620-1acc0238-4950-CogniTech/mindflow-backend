@@ -48,7 +48,7 @@ public class HabitLogsController : ControllerBase
         {
             var habit = await _habitRepository.FindByIdAndUserIdAsync(habit_id.Value, userId, cancellationToken);
             if (habit is null)
-                return NotFound(new { message = "Habit not found." });
+                return NotFound(new { error = "Habit not found." });
         }
 
         var query = new GetAllHabitLogsQuery(userId, habit_id);
@@ -63,7 +63,7 @@ public class HabitLogsController : ControllerBase
         var userId = GetAuthenticatedUserId();
         var habit = await _habitRepository.FindByIdAndUserIdAsync(resource.HabitId, userId, cancellationToken);
         if (habit is null)
-            return NotFound(new { message = "Habit not found." });
+            return NotFound(new { error = "Habit not found." });
 
         var command = CreateHabitLogCommandFromResourceAssembler.ToCommandFromResource(resource);
         var result = await _habitLogCommandService.Handle(command, cancellationToken);
@@ -81,11 +81,11 @@ public class HabitLogsController : ControllerBase
         var userId = GetAuthenticatedUserId();
         var log = await _habitLogQueryService.Handle(new GetHabitLogByIdQuery(id), cancellationToken);
         if (log is null)
-            return NotFound(new { message = "Habit log not found." });
+            return NotFound(new { error = "Habit log not found." });
 
         var habit = await _habitRepository.FindByIdAndUserIdAsync(log.HabitId, userId, cancellationToken);
         if (habit is null)
-            return NotFound(new { message = "Habit log not found." });
+            return NotFound(new { error = "Habit log not found." });
 
         return Ok(HabitLogResourceFromEntityAssembler.ToResourceFromEntity(log));
     }
@@ -96,11 +96,11 @@ public class HabitLogsController : ControllerBase
         var userId = GetAuthenticatedUserId();
         var log = await _habitLogQueryService.Handle(new GetHabitLogByIdQuery(id), cancellationToken);
         if (log is null)
-            return NotFound(new { message = "Habit log not found." });
+            return NotFound(new { error = "Habit log not found." });
 
         var habit = await _habitRepository.FindByIdAndUserIdAsync(log.HabitId, userId, cancellationToken);
         if (habit is null)
-            return NotFound(new { message = "Habit log not found." });
+            return NotFound(new { error = "Habit log not found." });
 
         var command = UpdateHabitLogCommandFromResourceAssembler.ToCommandFromResource(id, resource);
         var result = await _habitLogCommandService.Handle(command, cancellationToken);
@@ -118,11 +118,11 @@ public class HabitLogsController : ControllerBase
         var userId = GetAuthenticatedUserId();
         var log = await _habitLogQueryService.Handle(new GetHabitLogByIdQuery(id), cancellationToken);
         if (log is null)
-            return NotFound(new { message = "Habit log not found." });
+            return NotFound(new { error = "Habit log not found." });
 
         var habit = await _habitRepository.FindByIdAndUserIdAsync(log.HabitId, userId, cancellationToken);
         if (habit is null)
-            return NotFound(new { message = "Habit log not found." });
+            return NotFound(new { error = "Habit log not found." });
 
         var command = new DeleteHabitLogCommand(id);
         var result = await _habitLogCommandService.Handle(command, cancellationToken);

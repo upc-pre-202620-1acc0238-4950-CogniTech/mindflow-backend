@@ -22,9 +22,9 @@ public class AiFeedbackService(AppDbContext db, IUnitOfWork unitOfWork) : IAiFee
 
         var contentExists = contentType switch
         {
-            "journal" => await db.JournalEntries.AnyAsync(e => e.Id == contentId),
+            "journal" => await db.JournalEntries.AnyAsync(e => e.Id == contentId && e.UserId == userId),
             "habit" => await db.Set<Mindflow_backend.Habits.Domain.Model.Aggregates.Habit>()
-                .AnyAsync(h => h.Id == contentId),
+                .AnyAsync(h => h.Id == contentId && h.UserId == userId),
             _ => false
         };
 
@@ -61,6 +61,7 @@ public class AiFeedbackService(AppDbContext db, IUnitOfWork unitOfWork) : IAiFee
         return await db.AiFeedbackRatings
             .Where(f => f.UserId == userId)
             .OrderByDescending(f => f.CreatedAt)
+            .Take(200)
             .ToListAsync();
     }
 

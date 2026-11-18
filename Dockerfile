@@ -14,7 +14,7 @@ RUN dotnet publish "MindFlow.Platform.csproj" -c Release -o /app/publish /p:UseA
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-# Azure App Service forwards traffic to this container port.
+# El proxy de Railway reenvía el tráfico a este puerto del contenedor.
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080 \
     ASPNETCORE_FORWARDEDHEADERS_ENABLED=true \
